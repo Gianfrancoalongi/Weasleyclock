@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link href='http://fonts.googleapis.com/css?family=Tangerine:700' rel='stylesheet' type='text/css'>
+
+<meta charset="ISO-8859-1">
+<title>Clock Test</title>
+
+<script src="http://www.html5canvastutorials.com/libraries/kinetic2d-v1.0.0.js">
+</script>
+
+    <script type="text/javascript">
+    
+    String.prototype.width = function(font,size) {
+    	  var div = document.createElement('div');
+    	  document.body.appendChild(div);
+    	  div.style.position = 'absolute';
+    	  div.style.float = 'left';
+    	  div.style.visibility = 'hidden';
+    	  div.style.fontFamily = font;
+    	  div.style.fontSize = size + "px";
+    	  div.innerHTML = this;
+    	  var w = div.clientWidth;
+    	  document.body.removeChild(div);
+    	  return w;
+    }
+    
+    Array.prototype.remove= function(){
+        var what, a= arguments, L= a.length, ax;
+        while(L && this.length){
+            what= a[--L];
+            while((ax= this.indexOf(what))!= -1){
+                this.splice(ax, 1);
+            }
+        }
+        return this;
+    } 
+        var numberOfUsers;
+        var places = new Array();
+	var numberOfPlaces;
+	var position = new Object();
+	var toBeMoved = new Array();
+	var hand_x = new Object();
+        var hand_y = new Object();
+	var angle = new Object();
+	var angle_stop = new Object();
+	var direction = new Object();
+	var users = new Array();
+	
+        var kin;
+        var img0 = new Image();
+        var img1 = new Image();
+    
+        var center_x 	 = 300;
+	var center_y 	 = 300;
+	var inner_radius = 190;
+	var outer_radius = 230;
+	var hand_length  = 180;
+	var line_width   = 4;
+    
+	function addStatus(text){
+	    var date = new Date();
+	    document.getElementById('status').innerHTML = document.getElementById('status').innerHTML + date + ": " + text + "<br>";				
+	}
+	
+	function ready(){
+		img0.src = "ZooWood.069.jpg";
+		img1.src = "ZooWood.054.jpg";
+		
+		places.push(
+                        #PLACES
+                       );
+		numberOfPlaces = places.length;
+
+		users.push(
+                         #USERS
+                         );
+               numberOfUsers = users.length;
+
+                for(var i = 0; i < numberOfUsers; i++){
+                  position[users[i]] = 0;
+                }
+		
+		refreshClock();
+		initAnimation();
+		
+	    if ("WebSocket" in window) {
+		// browser supports websockets
+		var ws = new WebSocket("ws://#IP:#PORT/service");
+		ws.onopen = function() {
+		    // websocket is connected
+		    addStatus("websocket connected!");
+		    // send hello data to server.
+		    ws.send("hello server!");
+		    addStatus("sent message to server: 'hello server'!");
+		};
+		ws.onmessage = function (evt) {
+		    var receivedMsg = evt.data;
+		    addStatus("server sent the following: '" + receivedMsg + "'");
+		    
+		    var str = receivedMsg.split(',');
+		    
+		    var user = str[0];
+		    var to   = str[1];
+		    
+		    moveHand(user,to);
+		};
+		ws.onclose = function() {
+		    // websocket was closed
+		    addStatus("websocket was closed");
+		};
+	    } else {
+		// browser does not support websockets
+		addStatus("sorry, your browser does not support websockets.");
+	    }
+	}
+	
+	function updateStage(){
+		
+		if (toBeMoved.length == 0){
+			kin.stopAnimation();
+			return;
+		}
+		
+		var angularSpeed = (Math.PI/180)*32; // 32 degrees/second
+        var angularDistEachFrame = angularSpeed * kin.getTimeInterval() / 1000;
+ 	    
+		for (var i = 0; i < toBeMoved.length; i++){
+			var hand = toBeMoved[i]; 
+			if (!direction[hand]){
+				if (angle[hand] > angle_stop[hand]){
+					angle[hand] = angle[hand] - angularDistEachFrame;
+					
+				    hand_x[hand] = center_x + hand_length * Math.cos(angle[hand]);
+				    hand_y[hand] = center_y + hand_length * Math.sin(angle[hand]);
+				}else{
+					toBeMoved.remove(hand);
+				}
+			}else{
+				if (angle[hand] < angle_stop[hand]){
+					angle[hand] = angle[hand] + angularDistEachFrame;
+					
+				    hand_x[hand] = center_x + hand_length * Math.cos(angle[hand]);
+				    hand_y[hand] = center_y + hand_length * Math.sin(angle[hand]);
+				}else{
+					toBeMoved.remove(hand);
+				}
+			}
+		}
+	}
+	
+	function initAnimation(){
+		kin = new Kinetic_2d("clock");
+	    kin.setDrawStage(function(){
+	    	if (kin.isAnimating()) {
+                updateStage();
+            }
+	    	//kin.clear();
+	    	refreshClock();
+	    	var context = kin.getContext();
+	    	context.save();
+			context.beginPath();
+			context.arc(center_x,center_y,inner_radius-line_width,0,Math.PI*2,false);
+			context.clip();
+			context.drawImage(img1,0,0);
+			context.drawImage(img1,0,img1.height);
+			context.restore();
+			drawHands();
+		    for (var i = 0; i < toBeMoved.length; i++){
+		    	drawHand(context,toBeMoved[i],hand_x[toBeMoved[i]],hand_y[toBeMoved[i]]);
+		    }
+	    });
+	    kin.startAnimation();
+	}
+	
+	function moveHand(hand_id, dest){
+		var to = getPositionOfPlace(dest);
+		if (to == -1){
+			return;
+		}
+		
+		if (position[hand_id] == to){
+			return;
+		}
+		
+		if (toBeMoved.indexOf(hand_id) == -1){
+			angle[hand_id] = (position[hand_id]/numberOfPlaces)*Math.PI*2;
+		}
+	    angle_stop[hand_id] = (to/numberOfPlaces)*Math.PI*2;
+	    
+	    if (angle_stop[hand_id] > angle[hand_id]){
+	    	direction[hand_id] = true;
+	    	if ((angle_stop[hand_id] - angle[hand_id]) > Math.PI){
+	    		direction[hand_id] = false;
+	    		angle[hand_id] += Math.PI*2;
+	    	}
+	    }else{
+	    	direction[hand_id] = false;
+	    	if ((angle[hand_id] - angle_stop[hand_id]) > Math.PI){
+	    		direction[hand_id] = true;
+	    		angle_stop[hand_id] += Math.PI*2;
+	    	}
+	    }
+	    
+	    toBeMoved.push(hand_id);
+	    if (!kin.isAnimating()) {
+	    	kin.startAnimation();
+	    }
+	    position[hand_id] = to;
+	}
+	
+	function addPlace(place){
+		// Insert place at random location in places
+		var i = Math.random()*numberOfPlaces;
+		places.splice(i,0,place);
+		numberOfPlaces = places.length;
+	}
+	
+	function removePlace(place){
+		places.remove(place);
+		numberOfPlaces = places.length;
+	}
+	
+	function getPositionOfPlace(place){
+		for (var i = 0; i < numberOfPlaces; i++){
+			if (places[i] == place){
+				return i;
+			}
+		}
+		return -1;
+	}
+	
+	function refreshClock(){
+		drawClock();
+		drawPlaces();
+		drawHands();
+	}
+	
+	function drawHands(){
+		var clock_canvas  = document.getElementById("clock");
+		var clock_context = clock_canvas.getContext("2d");
+		clock_context.beginPath();
+		clock_context.arc(center_x,center_y,4,0,Math.PI*2,true);
+		clock_context.closePath();
+		clock_context.fill();
+		for(var prop in position) {
+			if (position.hasOwnProperty(prop)){
+				if (toBeMoved.indexOf(prop) == -1){
+					var x1 = center_x + hand_length * Math.cos((position[prop]/numberOfPlaces)*Math.PI*2);
+					var y1 = center_y + hand_length * Math.sin((position[prop]/numberOfPlaces)*Math.PI*2);
+					drawHand(clock_context,prop,x1,y1);
+				}
+			}
+		}
+	}
+	
+	function drawHand(ctx,id,x,y){
+		
+		// Handle
+		var handle_x = center_x + 0.5*(x - center_x);
+		var handle_y = center_y + 0.5*(y - center_y);
+		
+		ctx.strokeStyle = "black";
+		ctx.lineWidth = line_width;
+		ctx.beginPath();
+		ctx.moveTo(center_x,center_y);
+		ctx.lineTo(handle_x,handle_y);
+		ctx.closePath();
+		ctx.stroke();
+		
+		// Circle
+		var circle_x1 = center_x + 0.6*(x - center_x); 
+		var circle_y1 = center_y + 0.6*(y - center_y);
+		var circle_r1 = 20;
+		var circle_x2 = center_x + 0.615*(x - center_x); 
+		var circle_y2 = center_y + 0.615*(y - center_y);
+		var circle_r2 = 15;
+		
+		ctx.save();
+		ctx.fillStyle = "black";
+    	ctx.beginPath();
+    	ctx.arc(circle_x1,circle_y1,circle_r1,0,Math.PI*2,true);
+    	ctx.fill();
+    	ctx.closePath();
+    	ctx.beginPath();
+    	ctx.arc(circle_x2,circle_y2,circle_r2,0,Math.PI*2,true);
+    	ctx.closePath();
+    	ctx.clip();
+    	ctx.drawImage(img1,0,0);
+		ctx.drawImage(img1,0,img1.height);
+		ctx.restore();
+		
+		// Pointy bit
+		var a;
+		if (((x-center_x) < 0) && ((y-center_y) < 0)){
+			a  = -Math.acos((x-center_x)/hand_length);
+		}else if ((x-center_x) < 0){
+			a  = Math.acos((x-center_x)/hand_length);
+		}else if ((y-center_y) < 0){
+			a  = -Math.acos((x-center_x)/hand_length);
+		}else{
+			a  = Math.acos((x-center_x)/hand_length);
+		}
+		var x1 = center_x + 0.7*hand_length*Math.cos(a+0.03);
+		var y1 = center_y + 0.7*hand_length*Math.sin(a+0.03);
+		var x2 = center_x + 0.7*hand_length*Math.cos(a-0.03);
+		var y2 = center_y + 0.7*hand_length*Math.sin(a-0.03);
+		
+		ctx.beginPath();
+		ctx.moveTo(x1,y1);
+		ctx.lineTo(x2,y2);
+		ctx.lineTo(x,y);
+		ctx.lineTo(x1,y1);
+		ctx.fill();
+		ctx.closePath();
+		
+		// Id on hand
+		var text_x = center_x + 0.2*hand_length*Math.cos(a-0.2);
+		var text_y = center_y + 0.2*hand_length*Math.sin(a-0.2);
+		
+		ctx.save();
+		ctx.translate(text_x,text_y);
+		ctx.rotate(a);
+		ctx.fillText(id,0,0);
+		ctx.restore();
+	}
+	
+	function drawClock(){
+		var clock_canvas  = document.getElementById("clock");
+		var clock_context = clock_canvas.getContext("2d");
+		
+		clock_context.clearRect(0,0,720,720);
+		
+		clock_context.drawImage(img1,0,0);
+		clock_context.drawImage(img1,0,img1.height);
+		
+		clock_context.strokeStyle = "black";
+		clock_context.lineWidth = line_width;
+		
+		clock_context.save();
+		clock_context.beginPath();
+		clock_context.arc(center_x,center_y,outer_radius,0,Math.PI*2,false);
+		clock_context.clip();
+		clock_context.drawImage(img0,0,0);
+		clock_context.drawImage(img0,0,img0.height);
+		clock_context.restore();
+		
+		clock_context.save();
+		clock_context.beginPath();
+		clock_context.arc(center_x,center_y,inner_radius,0,Math.PI*2,false);
+		clock_context.clip();
+		clock_context.drawImage(img1,0,0);
+		clock_context.drawImage(img1,0,img1.height);
+		clock_context.restore();
+		
+		clock_context.beginPath();
+		clock_context.arc(center_x,center_y,outer_radius,0,Math.PI*2,true);
+		clock_context.closePath();
+		clock_context.stroke();
+		
+		clock_context.beginPath();
+                clock_context.arc(center_x,center_y,inner_radius,0,Math.PI*2,true);
+		clock_context.closePath();
+		clock_context.stroke();
+		
+		for (var i = 0; i < numberOfPlaces; i++){
+			var step = i/numberOfPlaces;
+			var alpha = (step+(0.5/numberOfPlaces))*Math.PI*2;
+			var x0 = (hand_length+10) * Math.cos(alpha);
+			var y0 = (hand_length+10) * Math.sin(alpha);
+			var x1 = outer_radius * Math.cos(alpha);
+			var y1 = outer_radius * Math.sin(alpha);
+			clock_context.moveTo(center_x + x0, center_y + y0);
+			clock_context.lineTo(center_x + x1, center_y + y1);
+		}
+		clock_context.stroke();
+	}
+	
+	function drawPlaces(){
+		for (var i = 0; i < numberOfPlaces; i++){
+			drawPlace(places[i],i);
+		}
+	}
+	
+	function drawPlace(text,pos){
+		var clock_canvas  = document.getElementById("clock");
+		var clock_context = clock_canvas.getContext("2d");
+		
+		var angle_min = ((pos-0.5)/numberOfPlaces) * Math.PI*2;
+		var angle_max = ((pos+0.5)/numberOfPlaces) * Math.PI*2;
+		
+		var text_position = inner_radius + 3*line_width;
+		var alpha = angle_max - angle_min;
+		var available_width = 0.7 * alpha * text_position;
+		
+		var text_size = 12;
+		var text_width;
+		var font;
+		
+		do{
+			font = "Tangerine";
+			text_width = text.width(font,text_size++);
+		}while((text_width < available_width) && (text_size < (outer_radius - text_position)));
+		
+		clock_context.font = "" + text_size + "px " + font;
+		
+		var step = pos/numberOfPlaces;
+		var start_angle = (step*Math.PI*2) - ((text_width/2)/text_position);
+		
+		var width_without_spaces = 0;
+		for (var i = 0; i < text.length; i++){
+			if (text[i] == ' '){
+				width_without_spaces += "_".width(font,text_size);
+			}else{
+				width_without_spaces += text[i].width(font,text_size);
+			}
+		}
+		
+		var angle_between_chars = (text_width - width_without_spaces)/text_position/(text.length-1);
+		
+		for (var i = 0; i < text.length; i++){
+			var str = text[i];
+			var angle_of_char = str.width(font,text_size)/text_position;
+			var prev_chars;
+			if (i == 0){
+				prev_chars = 0;
+			}else if(text[i-1] == ' '){
+				prev_chars += "_".width(font,text_size)/text_position + angle_between_chars;
+			}else{
+				prev_chars += text[i-1].width(font,text_size)/text_position + angle_between_chars;
+			}
+			var a = start_angle + prev_chars;
+			var text_x = center_x + text_position * Math.cos(a);
+			var text_y = center_y + text_position * Math.sin(a);
+			clock_context.save();
+			clock_context.translate(text_x,text_y);
+			clock_context.rotate(a + (Math.PI/2) + (angle_of_char/2));
+			clock_context.fillText(str,0,0);
+			clock_context.restore();
+		}
+	}
+		
+    </script>
+
+</head>
+
+<body onload="ready();">
+
+<canvas id="clock" width="600" height="600">
+Your browser does not support the canvas element.
+</canvas>
+
+<div id="status"></div>
+
+</body>
+</html>

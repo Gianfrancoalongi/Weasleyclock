@@ -1,0 +1,13 @@
+{application, wc_backend,
+ [
+  {description, ""},
+  {vsn, "0.1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+		  wc_websvc
+                 ]},
+  {mod, { wc_backend_app, []}},
+  {env, []}
+ ]}.

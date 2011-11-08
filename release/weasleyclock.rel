@@ -1,0 +1,9 @@
+{release,
+ {"weasleyclock","0.1.0"},
+ {erts,"5.8.4"},
+ [{kernel, "2.14.4"},
+  {stdlib, "1.17.4"},
+  {misultin, "0.8"},
+  {wc_websvc, "0.1"},
+  {wc_backend, "0.1"}
+ ]}.

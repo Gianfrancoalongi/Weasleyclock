@@ -1,0 +1,8 @@
+{application,wc_websvc,
+             [{description,[]},
+              {vsn,"0.1"},
+              {registered,[]},
+              {applications,[kernel,stdlib,misultin]},
+              {mod,{wc_websvc_app,[]}},
+              {env,[]},
+              {modules,[wc_websvc,wc_websvc_app,wc_websvc_sup]}]}.
